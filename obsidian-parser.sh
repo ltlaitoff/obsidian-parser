@@ -3,6 +3,44 @@
 # set -x
 shopt -s extglob
 
+file_templates_dir="$HOME/.config/obsidian-parser/file-templates/"
+file_template="base.md"
+
+CONFIG_FILE="$HOME/.config/obsidian-parser/config.conf"
+
+. $CONFIG_FILE
+
+while [[ $# -gt 0 ]]; do
+        case $1 in
+        -ftf | --files-template-directory)
+								file_templates_dir="$2"
+                shift # past argument
+                shift # past value
+                ;;
+        -ft | --file-template)
+                file_template="$2"
+                shift # past argument
+                shift # past value
+                ;;
+        # -c | --config)
+        #         CONFIG_FILE="$2"
+        #         shift # past argument
+        #         shift # past value
+        #         ;;
+        -* | --*)
+                echo -e "Unknown option $1"
+                exit 1
+                ;;
+        *)
+                POSITIONAL_ARGS+=("$1") # save positional arg
+                shift                   # past argument
+                ;;
+
+        esac
+done
+
+set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+
 if [ -z "$1" ]; then
   echo "Error: You need to provide a input file path."
   echo "Usage: $0 <file_path>"
@@ -15,16 +53,8 @@ if [ -z "$2" ]; then
   exit 1
 fi
 
-# TODO: Change to param
-if [ -z "$3" ]; then
-  echo "Error: You need to provide a output directory path."
-  echo "Usage: $0 <directory_path>"
-  exit 1
-fi
-
 INPUT_FILE=$1
 OUTPUT_DIRECTORY=$2
-ROOT_FILE_TEMPLATE=$3
 
 block_id=0
 note_after_title=false
@@ -46,7 +76,6 @@ change_string_in_text () {
 	echo "$1" | awk -v note_text="$2" -v pattern="$3" '{gsub("\\{\\{" pattern "\\}\\}", note_text); print}'
 }
 
-# TODO: Read config file, if global_file_template -> read file by name from templates folder
 function save_file () {
 	local file_name="$OUTPUT_DIRECTORY/${note_title}.md"
 	
@@ -54,12 +83,13 @@ function save_file () {
 
 	local file_template_content=""
 
-	file_template_content=$(cat $ROOT_FILE_TEMPLATE)
+	if [[ -n $global_file_template ]]; then
+		template_file_path="$file_templates_dir$global_file_template.md"
 
-	# if [[ -z global_file_template ]]; then
-	# else
-	# 	file_template_content=$(cat '')
-	# fi
+		file_template_content=$(cat "$template_file_path")
+	else
+		file_template_content=$(cat "$file_templates_dir$file_template")
+	fi
 
 	file_template_content=$(change_string_in_text "$file_template_content" "$note_text" "note_text")
 	file_template_content=$(change_string_in_text "$file_template_content" "$note_north" "note_north")
@@ -85,6 +115,8 @@ function save_file () {
 
 	file_template_content=$(change_string_in_text "$file_template_content" "$tags_output" "tags")
 	file_template_content=$(change_string_in_text "$file_template_content" "$source_output" "source")
+
+	echo "output to $file_name"
 
 	echo -e "$file_template_content" > "$file_name"
 }
@@ -171,3 +203,5 @@ while read line; do
 		note_text+="$line\n"
 	fi
 done < $INPUT_FILE
+
+
